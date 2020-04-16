@@ -1,11 +1,16 @@
 const {io} = require('../server')
+const { TicketControl } = require('./classes/ticket-control');
+
+const ticketControl = new TicketControl();
+
 
 io.on("connection", (client) => {
   console.log("Cliente conectado");
 
-  //Enviar mensaje a cliente 1 - 1
-  client.emit("sendMsg", {
-    msg: "Hola bb desde el server",
+  //Enviar el estado actual
+  client.emit("currentState",{
+    lastTicket:ticketControl.getLastTicket(),
+    lastFour:ticketControl.getLastFour()
   });
 
   client.on("disconnect", () => {
@@ -17,24 +22,46 @@ io.on("connection", (client) => {
   });
 
   //Escuchando a cliente
-  client.on("sendMsg", (data, callback) => {
+  client.on("newTicket", (data, callback) => {
 
-    //Contestando con otro emit
-        // client.emit("sendMsg",{
-        //     msg:"Soy el servidor"
-        // });
+      let newTicket = ticketControl.nextTicket();
 
-        //Contestando con broadtcast a todo el mundo menos al mismo
-        client.broadcast.emit("sendMsg",{
-            msg:data.msg
+        // contestando con el callback
+             callback(newTicket);
         });
 
 
-        console.log(data.msg);
+  client.on("attendTicket", (data, callback) => {
 
-        //contestando con el callback
-            // callback({
-            //   msg: "OK",
-            // });
-        });
+          if(!data.desktop){
+              callback({
+                status:false,
+                msg:"El escritorio es obligatorio"
+              });
+          }
+
+          let attendTicket = ticketControl.attendTicket(data.desktop);
+
+          if (attendTicket.hasOwnProperty('msg')) {
+                callback({
+                  status: false,
+                  msg: attendTicket.msg,
+                });
+          }else{
+                callback({
+                  status: true,
+                  attendTicket,
+                });
+          }
+
+
+     client.broadcast.emit("currentState", {
+       lasTicket: ticketControl.getLastTicket(),
+       lastFour: ticketControl.getLastFour(),
+     });
+
+
+  });   
+
+
 });
